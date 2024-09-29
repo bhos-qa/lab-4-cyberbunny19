@@ -1,0 +1,48 @@
+name: Quality Assurance Workflow
+
+on:
+  pull_request:
+    branches:
+      - develop
+
+jobs:
+  quality_check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Source Code Checkout
+        uses: actions/checkout@v2
+
+      - name: Configure JDK 21 Environment
+        uses: actions/setup-java@v1
+        with:
+          java-version: '21'
+
+      - name: Gradle Dependency Caching
+        uses: actions/cache@v2
+        with:
+          path: ~/.gradle/caches
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle
+
+      - name: Set Gradle Wrapper Permissions
+        run: chmod +x gradlew
+
+      - name: Build Project with Gradle
+        run: ./gradlew build
+
+      - name: Execute Tests and Generate Jacoco Report
+        run: ./gradlew test jacocoTestReport
+
+      - name: Run SonarCloud Code Analysis
+        uses: sonarsource/sonarcloud-github-action@v3.0.0
+        with:
+          projectBaseDir: '.'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Upload Jacoco Test Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: jacoco-report
+          path: app/build/reports/jacoco/test/html/index.html
